@@ -1,0 +1,7 @@
+{
+    "name": "mdbook-tools-dev",
+    "dockerFile": "../Containerfile",
+    "runArgs": [
+        "--userns=keep-id:uid=$(id -u),gid=$(id -g)"
+    ]
+}
