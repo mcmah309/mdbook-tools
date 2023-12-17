@@ -21,6 +21,8 @@
                 }
             },
             "args": ["create", "--sourcing-dir", "./testing/test-book/src"],
+            //"args": ["mv", "./testing/test-book/src/0001_doing_stuff/0001_title.md", "./testing/test-book/src/0002_having_stuff/", "3"],
+            //"args": ["mv", "./testing/test-book/src/0002_having_stuff/0003_title.md", "./testing/test-book/src/0001_doing_stuff/", "1"],
             "cwd": "${workspaceFolder}"
         },
         {

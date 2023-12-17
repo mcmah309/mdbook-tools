@@ -2,5 +2,5 @@
 	- [Title](/workspaces/mdbook-tools/testing/test-book/src/0001_doing_stuff/0001_title.md)
 	- [Just Do It](/workspaces/mdbook-tools/testing/test-book/src/0001_doing_stuff/0002_just_do_it.md)
 - [Having Stuff](/workspaces/mdbook-tools/testing/test-book/src/0002_having_stuff/README.md)
-	- [This Is 2](/workspaces/mdbook-tools/testing/test-book/src/0002_having_stuff/0001_this_is_2.md)
-	- [Booya](/workspaces/mdbook-tools/testing/test-book/src/0002_having_stuff/0002_booya.md)
+	- [Booya](/workspaces/mdbook-tools/testing/test-book/src/0002_having_stuff/0001_booya.md)
+	- [This Is 2](/workspaces/mdbook-tools/testing/test-book/src/0002_having_stuff/0002_this_is_2.md)

@@ -1,8 +1,7 @@
-use core::arch;
 use std::{path::{PathBuf, Path}, fs::{DirEntry, self}, io::{self, Write}, ops::Add};
 
 use anyhow::{Result, bail};
-use clap::{Parser, Subcommand, Arg, Args};
+use clap::{Parser, Subcommand, Args};
 
 #[derive(Parser, Debug)]
 #[command(author = "mcmah309", version="0.1", about=r#"
@@ -18,7 +17,6 @@ struct Cli {
 enum Subcommands {
     Create(Create),
     Mv(Mv),
-    MvDir(MvDir)
 }
 
 #[derive(Args,Debug)]
@@ -58,45 +56,22 @@ struct Create {
 
 #[derive(Args,Debug)]
 #[clap(about = r#"
-The 'mv' command facilitates reorganizing md files within the book's structure. 
-It allows moving a file to a specified position (index) in a different directory. 
+The 'mv' command facilitates reorganizing md files or directories within the book's structure. 
+It allows moving a file or directory to a specified position (index) in a different directory. 
 The index numbering starts at 1, with 'README.md' being an exception as it's always considered the first item (index 0).
-When a file is moved to an occupied index, the existing file, and those following it,
-are automatically shifted down to accommodate the new file, and the original directory is updated as well.
+When a file is moved to an occupied index, the existing file or directory, and those following it,
+are automatically shifted down to accommodate the new file or directory, and the original directory is updated as well.
 Summary is not updated.
 "#)]
 struct Mv {
-    /// The path to the file to move
-    from_file: PathBuf,
+    /// The path of the file or directory to move
+    from: PathBuf,
 
     /// The path to the directory to move to
     to_dir: PathBuf,
 
     /// The index to put in the new directory. Must be greater than or equal to one. Note: "README.md" files are always first and considerd index 0.
     index: u32,
-
-    /// If provided, at the end the summary file will not be updated
-    #[arg(long)]
-    do_not_update_summary: bool,
-}
-
-#[derive(Args,Debug)]
-#[clap(about = r#"
-Works in the same way as 'mv' command, except works on directories instead of files.
-"#)]
-struct MvDir {
-    /// The path to the directory to move
-    from_dir: PathBuf,
-
-    /// The path to the directory to move to
-    to_dir: PathBuf,
-
-    /// The index to put in the new directoy. Must be greater than or equal to one.
-    index: u32,
-
-    /// If provided, at the end the summary file will not be updated
-    #[arg(long)]
-    do_not_update_summary: bool,
 }
 
 fn main() -> Result<()> {
@@ -105,8 +80,7 @@ fn main() -> Result<()> {
     match cmd.command {
         Subcommands::Mv(mv) => mv_command(mv),
         Subcommands::Create(create) => create_command(create),
-        Subcommands::MvDir(mv_dir) => mv_dir_command(mv_dir),
-    };
+    }?;
     //todo
     
     Ok(())
@@ -213,11 +187,108 @@ fn capitalize_first_letter_of_each_word(s: &str) -> String {
         .join(" ")
 }
 
+///////////
 
-fn mv_command (mv: Mv) -> Result<()> {
-    todo!()
+fn mv_command(mv: Mv) -> Result<()>{
+    if !mv.from.exists() {
+        bail!("Source does not exist");
+    }
+
+    if !mv.to_dir.exists() || !mv.to_dir.is_dir() {
+        bail!("Target directory does not exist or is not a directory");
+    }
+
+    if mv.index < 1 {
+        bail!("Index must be greater than or equal to one");
+    }
+
+    if  !mv.from.is_file() && !mv.from.is_dir() {
+        bail!("Source not a file or directory.")
+    }
+
+    let old_name = mv.from.file_name().unwrap().to_str().unwrap().to_owned();
+    let old_entry: (u32, String, PathBuf) = match split_number_from_name(&old_name) {
+        Some((num,name)) => (num, name, mv.from.clone()),
+        None => (0,old_name, mv.from.clone()),
+    };
+
+    let numbered_entries = get_numbered_entries(&mv.to_dir)?;
+
+    if mv.index as usize > numbered_entries.len() + 1 {
+        bail!("Index is greater than one more than the number of current ordered files and directories in the target directory.")
+    }
+
+    insert_at( &old_entry, &mv.to_dir, mv.index as usize, numbered_entries)?;
+
+    reorder(mv.from.parent().unwrap())?;
+
+    Ok(())
 }
 
-fn mv_dir_command (mv_dir: MvDir) -> Result<()> {
-    todo!()
+/// Gets the number entries sorted and validates that they are in order
+fn get_numbered_entries(dir: &Path) -> Result<Vec<(u32, String, DirEntry)>> {
+    let mut entries = fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let split = split_number_from_name(e.file_name().to_str().unwrap());
+            let Some((num, name)) = split else {
+                return None;
+            };
+            Some((num, name, e))
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|e| e.0);
+    let mut last_num = match entries.first() {
+        Some(last) => last.0,
+        None => return Ok(entries)
+    };
+    for (num, _, entry) in entries.iter().skip(1) {
+        if  last_num + 1 !=  *num {
+            bail!(format!("Numbered entries are not continous. Expected entry number {} got {} for {}", last_num + 1, num, entry.path().canonicalize().unwrap().to_str().unwrap()));
+        }
+        last_num += 1;
+    }
+
+    Ok(entries)
+}
+
+fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usize, prefixed_entries: Vec<(u32, String, DirEntry)>) -> Result<()> {
+    if index == prefixed_entries.len() + 1 {
+        let new_name = format!("{:04}_{}", index, old_dir_entry.1);
+        let new_path = new_dir.join(new_name);
+        fs::rename(&old_dir_entry.2, &new_path).map_err(|e| anyhow::anyhow!(e))?;
+        return Ok(())
+    }
+    let mut order_count = 1;
+    for (num, name, entry) in prefixed_entries.into_iter() {
+        // entry already exists in dest. So do not count this position.
+        if old_dir_entry.2 == entry.path() && order_count != index {
+            assert!(old_dir_entry.0 == num && old_dir_entry.1 == name);
+            continue;
+        }
+        // This is the file or folder we want to insert at
+        if order_count == index {
+            let new_name = format!("{:04}_{}", order_count, old_dir_entry.1);
+            let new_path = new_dir.join(new_name);
+            fs::rename(&old_dir_entry.2, &new_path).map_err(|e| anyhow::anyhow!(e))?;
+            order_count += 1;
+        }
+        let new_name = format!("{:04}_{}", order_count, name);
+        let new_path = new_dir.join(new_name);
+        fs::rename(entry.path(), &new_path).map_err(|e| anyhow::anyhow!(e))?;
+        order_count += 1;
+    }
+
+    Ok(())
+}
+
+fn reorder(dir: &Path) -> Result<()> {
+    let prefixed_entries = get_numbered_entries(dir)?;
+    for (index, (_, name, entry)) in prefixed_entries.into_iter().enumerate() {
+        let new_name = format!("{:04}_{}", index + 1, name);
+        let new_path = dir.join(new_name);
+        fs::rename(entry.path(), &new_path).map_err(|e| anyhow::anyhow!(e))?;
+    }
+
+    Ok(())
 }
