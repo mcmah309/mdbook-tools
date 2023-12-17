@@ -1,0 +1,47 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            //"initCommands":["settings set target.disable-aslr false"],
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'mdbook-tools'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=mdbook-tools",
+                    "--package=mdbook-tools"
+                ],
+                "filter": {
+                    "name": "mdbook-tools",
+                    "kind": "bin"
+                }
+            },
+            "args": ["create", "--sourcing-dir", "./testing/test-book/src"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            //"initCommands":["settings set target.disable-aslr false"],
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'mdbook-tools'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=mdbook-tools",
+                    "--package=mdbook-tools"
+                ],
+                "filter": {
+                    "name": "mdbook-tools",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
