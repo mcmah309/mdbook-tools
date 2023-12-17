@@ -1,6 +1,6 @@
 # Container file used to develop
 
-FROM rust:latest
+FROM rust:1.74.1
 WORKDIR /app
 
 # Leave container running until shutdown

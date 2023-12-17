@@ -1,7 +1,15 @@
 {
     "name": "mdbook-tools-dev",
     "dockerFile": "../Containerfile",
-    "runArgs": [
-        "--userns=keep-id:uid=$(id -u),gid=$(id -g)"
-    ]
+    "customizations": {
+        "vscode": {
+          "extensions": [
+            "rust-lang.rust-analyzer",
+            "tamasfe.even-better-toml"
+          ]
+        }
+    }
+    // "runArgs": [
+    //     "--userns=keep-id:uid=$(id -u),gid=$(id -g)"
+    // ]
 }
