@@ -15,23 +15,23 @@ struct Cli {
 
 #[derive(Subcommand,Debug)]
 enum Subcommands {
-    Create(Create),
+    Summary(Summary),
     Mv(Mv),
 }
 
 #[derive(Args,Debug)]
 #[clap(about = r#"
-The 'create' command automates the generation of a structured summary file for Markdown (md) documents within a book directory.
+The 'summary' command automates the generation of a structured summary file.
 It sequentially reads numbered md files and directories (e.g., "0001_") to define their order in the summary. 
-If any md files or directories do not have a number, they are ignored. If any directories do not have a 'README.md' they
-are ignored, but the descendants are still searched.
-This numbering resets for each subdirectory, reflecting their hierarchical structure in the summary.
-Notably, 'README.md' files are exempt from numbering and are always placed first (index 0).
-The command also translates directory names into section headers, by removing underscores, with 'README.md' as the content.
-The depth of directories dictating the nesting of sections.
-File names in the summary exclude these numeric prefixes, ensuring a clean, readable format.
+If any md files or directories do not have a number, they are ignored by default. 
+Directories use their 'README.md' file to define their content in the summary. As such, directories without a 'README.md' are ignored,
+but the descendants are still searched.
+Numbering resets for each directory, reflecting their hierarchical structure in the summary.
+'README.md' files are exempt from numbering.
+Section headers are created by removing underscores and capitalizing the first letter of each word.
+Section names exclude numeric prefixes.
 "#)]
-struct Create {
+struct Summary {
     /// A list of all files or directories (including their subdirectories) to ignore.
     #[arg(short,long)]
     ignore: Vec<PathBuf>,
@@ -47,10 +47,6 @@ struct Create {
     /// If set, directories without numbers will be placed in the summary in the order they are encountered.
     #[arg(long)]
     include_unnumbered_directories: bool,
-
-    /// If set, if a directory is encountered without a readme, it and all it's descendants are ignored.
-    #[arg(long)]
-    skip_directories_without_readme: bool,
 }
 
 
@@ -58,7 +54,7 @@ struct Create {
 #[clap(about = r#"
 The 'mv' command facilitates reorganizing md files or directories within the book's structure. 
 It allows moving a file or directory to a specified position (index) in a different directory. 
-The index numbering starts at 1, with 'README.md' being an exception as it's always considered the first item (index 0).
+The index numbering starts at 1, with 'README.md' is exempt.
 When a file is moved to an occupied index, the existing file or directory, and those following it,
 are automatically shifted down to accommodate the new file or directory, and the original directory is updated as well.
 Summary is not updated.
@@ -72,6 +68,11 @@ struct Mv {
 
     /// The index to put in the new directory. Must be greater than or equal to one. Note: "README.md" files are always first and considerd index 0.
     index: u32,
+
+    /// Level is used to indicate how many numbers on prefixes of names and files. e.g. "-l 4" indicates "0001_" is the 
+    /// type of prefix to expect.
+    #[arg(short,long, default_value = "2")]
+    level: usize,
 }
 
 fn main() -> Result<()> {
@@ -79,21 +80,21 @@ fn main() -> Result<()> {
 
     match cmd.command {
         Subcommands::Mv(mv) => mv_command(mv),
-        Subcommands::Create(create) => create_command(create),
+        Subcommands::Summary(create) => summary_command(create),
     }?;
     //todo
     
     Ok(())
 }
 
-fn create_command(create: Create) -> Result<()> {
+fn summary_command(create: Summary) -> Result<()> {
     let absolute_path = match fs::canonicalize(&create.sourcing_dir) {
         Ok(absolute_path) => absolute_path,
         Err(e) => bail!("The provided path to the book is not a real path for: {}", e), //todo check book is there
     };
     let mut summary_content = String::new();
 
-    fn process_directory(dir: &Path, create: &Create, summary_content: &mut String, nest_level: usize) -> io::Result<()> {
+    fn process_directory(dir: &Path, create: &Summary, summary_content: &mut String, nest_level: usize) -> io::Result<()> {
         if create.ignore.contains(&PathBuf::from(dir)) {
             return Ok(());
         }
@@ -218,9 +219,9 @@ fn mv_command(mv: Mv) -> Result<()>{
         bail!("Index is greater than one more than the number of current ordered files and directories in the target directory.")
     }
 
-    insert_at( &old_entry, &mv.to_dir, mv.index as usize, numbered_entries)?;
+    insert_at( &old_entry, &mv.to_dir, mv.index as usize, numbered_entries, mv.level)?;
 
-    reorder(mv.from.parent().unwrap())?;
+    reorder(mv.from.parent().unwrap(), mv.level)?;
 
     Ok(())
 }
@@ -252,9 +253,9 @@ fn get_numbered_entries(dir: &Path) -> Result<Vec<(u32, String, DirEntry)>> {
     Ok(entries)
 }
 
-fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usize, prefixed_entries: Vec<(u32, String, DirEntry)>) -> Result<()> {
+fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usize, prefixed_entries: Vec<(u32, String, DirEntry)>, level: usize) -> Result<()> {
     if index == prefixed_entries.len() + 1 {
-        let new_name = format!("{:04}_{}", index, old_dir_entry.1);
+        let new_name =  format!("{:0width$}_{}", index, old_dir_entry.1, width = level);
         let new_path = new_dir.join(new_name);
         fs::rename(&old_dir_entry.2, &new_path).map_err(|e| anyhow::anyhow!(e))?;
         return Ok(())
@@ -268,12 +269,12 @@ fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usiz
         }
         // This is the file or folder we want to insert at
         if order_count == index {
-            let new_name = format!("{:04}_{}", order_count, old_dir_entry.1);
+            let new_name = format!("{:0width$}_{}", index, old_dir_entry.1, width = level);
             let new_path = new_dir.join(new_name);
             fs::rename(&old_dir_entry.2, &new_path).map_err(|e| anyhow::anyhow!(e))?;
             order_count += 1;
         }
-        let new_name = format!("{:04}_{}", order_count, name);
+        let new_name = format!("{:0width$}_{}", index, old_dir_entry.1, width = level);
         let new_path = new_dir.join(new_name);
         fs::rename(entry.path(), &new_path).map_err(|e| anyhow::anyhow!(e))?;
         order_count += 1;
@@ -282,10 +283,10 @@ fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usiz
     Ok(())
 }
 
-fn reorder(dir: &Path) -> Result<()> {
+fn reorder(dir: &Path, level: usize) -> Result<()> {
     let prefixed_entries = get_numbered_entries(dir)?;
     for (index, (_, name, entry)) in prefixed_entries.into_iter().enumerate() {
-        let new_name = format!("{:04}_{}", index + 1, name);
+        let new_name = format!("{:0width$}_{}", index + 1, name, width = level);
         let new_path = dir.join(new_name);
         fs::rename(entry.path(), &new_path).map_err(|e| anyhow::anyhow!(e))?;
     }
