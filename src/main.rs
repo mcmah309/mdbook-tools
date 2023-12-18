@@ -266,11 +266,15 @@ fn mv_command(mv: Mv) -> Result<()>{
         bail!("Index is greater than one more than the number of current ordered files and directories in the target directory.")
     }
 
-    insert_at( &old_entry, &mv.to_dir, mv.index as usize, numbered_entries, mv.level)?;
-
     let parent_dir = mv.from.parent().unwrap();
     let prefixed_entries: Vec<(u32, String, DirEntry)> = get_numbered_entries(&parent_dir)?;
     validate_entries(&prefixed_entries)?;
+
+    insert_at( &old_entry, &mv.to_dir, mv.index as usize, numbered_entries, mv.level)?;
+
+    let prefixed_entries: Vec<(u32, String, DirEntry)> = get_numbered_entries(&parent_dir)?;
+    // no validation since the order is now off
+    
     reorder(&parent_dir, mv.level, prefixed_entries)?;
 
     Ok(())
@@ -298,6 +302,9 @@ fn validate_entries(entries: &Vec<(u32, String, DirEntry)>) -> Result<()> {
         Some(last) => last.0,
         None => return Ok(())
     };
+    if last_num != 1 {
+        bail!(format!("The first numbered file does not have index 1"))
+    }
     for (num, _, entry) in entries.iter().skip(1) {
         if  last_num + 1 !=  *num {
             bail!(format!("Numbered entries are not continous. Expected entry number {} got {} for {}", last_num + 1, num, entry.path().canonicalize().unwrap().to_str().unwrap()));
@@ -323,12 +330,12 @@ fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usiz
         }
         // This is the file or folder we want to insert at
         if order_count == index {
-            let new_name = format!("{:0width$}_{}", index, old_dir_entry.1, width = level);
+            let new_name = format!("{:0width$}_{}", order_count, old_dir_entry.1, width = level);
             let new_path = new_dir.join(new_name);
-            fs::rename(&old_dir_entry.2, &new_path).map_err(|e| anyhow::anyhow!(e))?;
+            fs:: rename(&old_dir_entry.2, &new_path).map_err(|e| anyhow::anyhow!(e))?;
             order_count += 1;
         }
-        let new_name = format!("{:0width$}_{}", index, old_dir_entry.1, width = level);
+        let new_name = format!("{:0width$}_{}", order_count, name, width = level);
         let new_path = new_dir.join(new_name);
         fs::rename(entry.path(), &new_path).map_err(|e| anyhow::anyhow!(e))?;
         order_count += 1;
