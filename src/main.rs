@@ -44,9 +44,15 @@ struct Summary {
     #[arg(short,long, default_value = ".")]
     output_dir: PathBuf,
 
-    /// If set, directories without numbers will be placed in the summary in the order they are encountered.
+    /// If set, directories without numbers, will be placed in the summary in the order they are encountered, 
+    /// if other conditions hold.
     #[arg(long)]
     include_unnumbered_directories: bool,
+
+    /// If set, if a section was not created for a directory, the directory's content will be included in the summary,
+    /// if other conditions hold.
+    #[arg(long)]
+    include_directory_content_without_section: bool,
 }
 
 
@@ -92,10 +98,17 @@ fn summary_command(sm: Summary) -> Result<()> {
         Ok(absolute_path) => absolute_path,
         Err(e) => bail!("The provided path to the source is not a real path for: {}", e), //todo check book is there
     };
+
+    let summary_file = sm.sourcing_dir.join("SUMMARY.md");
+    if summary_file.exists() {
+        fs::remove_file(summary_file)?;
+    }
+
     let mut summary_content = String::new();
 
     fn process_directory(dir: &Path, create: &Summary, summary_content: &mut String, nest_level: usize) -> io::Result<()> {
         if create.ignore.contains(&PathBuf::from(dir)) {
+            println!("Skipping directory, ignored: {}", dir.display());
             return Ok(());
         }
 
@@ -115,14 +128,23 @@ fn summary_command(sm: Summary) -> Result<()> {
         let mut next_nest_level = nest_level;
         let readme_path = dir.join("README.md");
 
-        let include_this_directory = (is_numbered_directory || create.include_unnumbered_directories) && readme_path.exists();
-        if include_this_directory {
+        let include_this_directory_as_section = (is_numbered_directory || create.include_unnumbered_directories) && readme_path.exists();
+        if include_this_directory_as_section {
             next_nest_level += 1;
             summary_content.push_str(&format!("{}- [{}]({})\n", 
             indentation,
             section_header,
             readme_path.display()));
             indentation = indentation.add("\t");
+        }
+        else {
+            println!("Skipping directory as section: {}", dir.display());
+        }
+
+        let include_this_directory_content = (is_numbered_directory || create.include_unnumbered_directories) && (readme_path.exists() || create.include_directory_content_without_section);
+
+        if !include_this_directory_content {
+            println!("Skipping directory's content: {}", dir.display());
         }
 
 
@@ -136,17 +158,20 @@ fn summary_command(sm: Summary) -> Result<()> {
             let path = entry.path();
             if path.is_dir() {
                 process_directory(&path, &create,  summary_content, next_nest_level)?;
-            } else if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
-                if file_name.ends_with(".md") && file_name != "README.md" {
-                    if let Some((_, mut name)) = split_number_from_name(file_name) {
-                        name.truncate(name.len() - 3);
-                        if let Some((_,name_without_number)) = split_number_from_name(&name) {
-                            name = capitalize_first_letter_of_each_word(&name_without_number.replace("_", " "));
+            } 
+            else if include_this_directory_content {
+                if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
+                    if file_name.ends_with(".md") && file_name != "README.md" {
+                        if let Some((_, mut name)) = split_number_from_name(file_name) {
+                            name.truncate(name.len() - 3);
+                            if let Some((_,name_without_number)) = split_number_from_name(&name) {
+                                name = capitalize_first_letter_of_each_word(&name_without_number.replace("_", " "));
+                            }
+                            else {
+                                name = capitalize_first_letter_of_each_word(&name.replace("_", " "));
+                            }
+                            summary_content.push_str(&format!("{}- [{}]({})\n", indentation, capitalize_first_letter_of_each_word(&name), path.display()));
                         }
-                        else {
-                            name = capitalize_first_letter_of_each_word(&name.replace("_", " "));
-                        }
-                        summary_content.push_str(&format!("{}- [{}]({})\n", indentation, capitalize_first_letter_of_each_word(&name), path.display()));
                     }
                 }
             }
