@@ -17,6 +17,7 @@ struct Cli {
 enum Subcommands {
     Summary(Summary),
     Mv(Mv),
+    ReOrder(ReOrder),
 }
 
 #[derive(Args,Debug)]
@@ -81,12 +82,28 @@ struct Mv {
     level: usize,
 }
 
+#[derive(Args,Debug)]
+#[clap(about = r#"
+Re-orders all the existing files in the path. Any gaps in the current order are collapsed and the new level is applied.
+e.g. ["001_..", "003_.."] for level 2 becomes ["01_", "02_"].
+"#)]
+struct ReOrder {
+    /// The path of the file or directory to move
+    path: PathBuf,
+
+    // Level is used to indicate how many numbers on prefixes of names and files. e.g. "-l 4" indicates "0001_" is the 
+    /// type of prefix to expect.
+    #[arg(short,long, default_value = "2")]
+    level: usize,
+}
+
 fn main() -> Result<()> {
     let cmd = Cli::parse();
 
     match cmd.command {
         Subcommands::Mv(mv) => mv_command(mv),
-        Subcommands::Summary(create) => summary_command(create),
+        Subcommands::Summary(sm) => summary_command(sm),
+        Subcommands::ReOrder(re_order) => re_order_command(re_order),
     }?;
     //todo
     
@@ -243,6 +260,7 @@ fn mv_command(mv: Mv) -> Result<()>{
     };
 
     let numbered_entries = get_numbered_entries(&mv.to_dir)?;
+    validate_entries(&numbered_entries)?;
 
     if mv.index as usize > numbered_entries.len() + 1 {
         bail!("Index is greater than one more than the number of current ordered files and directories in the target directory.")
@@ -250,7 +268,10 @@ fn mv_command(mv: Mv) -> Result<()>{
 
     insert_at( &old_entry, &mv.to_dir, mv.index as usize, numbered_entries, mv.level)?;
 
-    reorder(mv.from.parent().unwrap(), mv.level)?;
+    let parent_dir = mv.from.parent().unwrap();
+    let prefixed_entries: Vec<(u32, String, DirEntry)> = get_numbered_entries(&parent_dir)?;
+    validate_entries(&prefixed_entries)?;
+    reorder(&parent_dir, mv.level, prefixed_entries)?;
 
     Ok(())
 }
@@ -268,9 +289,14 @@ fn get_numbered_entries(dir: &Path) -> Result<Vec<(u32, String, DirEntry)>> {
         })
         .collect::<Vec<_>>();
     entries.sort_by_key(|e| e.0);
+
+    Ok(entries)
+}
+
+fn validate_entries(entries: &Vec<(u32, String, DirEntry)>) -> Result<()> {
     let mut last_num = match entries.first() {
         Some(last) => last.0,
-        None => return Ok(entries)
+        None => return Ok(())
     };
     for (num, _, entry) in entries.iter().skip(1) {
         if  last_num + 1 !=  *num {
@@ -278,8 +304,7 @@ fn get_numbered_entries(dir: &Path) -> Result<Vec<(u32, String, DirEntry)>> {
         }
         last_num += 1;
     }
-
-    Ok(entries)
+    Ok(())
 }
 
 fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usize, prefixed_entries: Vec<(u32, String, DirEntry)>, level: usize) -> Result<()> {
@@ -312,13 +337,19 @@ fn insert_at(old_dir_entry: &(u32, String, PathBuf), new_dir: &Path, index: usiz
     Ok(())
 }
 
-fn reorder(dir: &Path, level: usize) -> Result<()> {
-    let prefixed_entries = get_numbered_entries(dir)?;
+fn reorder(dir: &Path, level: usize, prefixed_entries: Vec<(u32, String, DirEntry)>) -> Result<()> {
     for (index, (_, name, entry)) in prefixed_entries.into_iter().enumerate() {
         let new_name = format!("{:0width$}_{}", index + 1, name, width = level);
         let new_path = dir.join(new_name);
         fs::rename(entry.path(), &new_path).map_err(|e| anyhow::anyhow!(e))?;
     }
 
+    Ok(())
+}
+
+/////////
+
+fn re_order_command(re_order: ReOrder) -> Result<()> {
+    reorder(&re_order.path, re_order.level, get_numbered_entries(&re_order.path)?)?;
     Ok(())
 }
