@@ -87,10 +87,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn summary_command(create: Summary) -> Result<()> {
-    let absolute_path = match fs::canonicalize(&create.sourcing_dir) {
+fn summary_command(sm: Summary) -> Result<()> {
+    let absolute_path = match fs::canonicalize(&sm.sourcing_dir) {
         Ok(absolute_path) => absolute_path,
-        Err(e) => bail!("The provided path to the book is not a real path for: {}", e), //todo check book is there
+        Err(e) => bail!("The provided path to the source is not a real path for: {}", e), //todo check book is there
     };
     let mut summary_content = String::new();
 
@@ -155,9 +155,13 @@ fn summary_command(create: Summary) -> Result<()> {
         Ok(())
     }
 
-    process_directory(&absolute_path, &create, &mut summary_content, 0)?;
+    process_directory(&absolute_path, &sm, &mut summary_content, 0)?;
 
-    let summary_path = absolute_path.join("SUMMARY.md");
+    let summary_path = match fs::canonicalize(&sm.output_dir) {
+        Ok(absolute_path) => absolute_path.join("SUMMARY.md"),
+        Err(e) => bail!("The provided path to the summary output is not a real path for: {}", e), //todo check book is there
+    };
+
     let mut file = fs::File::create(summary_path)?;
     file.write_all(summary_content.as_bytes())?;
 
