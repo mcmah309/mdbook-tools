@@ -1,6 +1,6 @@
 [package]
 name = "mdbook-tools"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "A collection of tools for mdbook"
 license = "MIT"
