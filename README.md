@@ -1,7 +1,10 @@
 
 # mdbook-tools
-`mdbook-tools` is a flexible cli tool for organizing files and creating mdbooks. Combining `mdbook-tools` and `mdbook` allows you to embed documentaion directly into your project structure or maintain a completely seperate set of documentation or notes.
 
+[![crates.io](https://img.shields.io/crates/v/mdbook-tools.svg)](https://crates.io/crates/mdbook-tools)
+[![License: MIT](https://img.shields.io/badge/license-MIT-purple.svg)](https://opensource.org/licenses/MIT)
+
+`mdbook-tools` is a flexible cli tool for organizing files and creating [mdBooks](https://github.com/rust-lang/mdBook). Combining `mdbook-tools` and `mdbook` allows you to embed documentaion directly into your project structure or maintain a completely seperate set of documentation or notes. The result is you are able to generate and maintian a concise book.
 
 ### Example Using mdbook-tools To Maintain Notes
 For a directory structure like
@@ -33,6 +36,20 @@ mdbook serve
 ```
 Will give you:
 ![Book Example](assets/outcome_example.png)
+
+### What You Can Accomplish
+
+📚 **Generate Books**
+  - Ignore files or directories
+  - Do not include parent directories that do no have notes/README
+  - Respect or ignore numbering for directories or files
+  - Source from additional input
+
+🗂 **Organize with Elegance**
+  - Move files or directories between directories and specify index in new directory
+  - Re-order files
+  - Apply ordering to non-ordered files
+
 
 ### CLI Preview
 ```
