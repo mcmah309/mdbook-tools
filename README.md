@@ -1,5 +1,40 @@
 
 # mdbook-tools
+`mdbook-tools` is a flexible cli tool for organizing files and creating mdbooks. Combining `mdbook-tools` and `mdbook` allows you to embed documentaion directly into your project structure or maintain a completely seperate set of documentation or notes.
+
+
+### Example Using mdbook-tools To Maintain Notes
+For a directory structure like
+```
+...
+├── python
+│   ├── 01_venv.md
+│   ├── 02_pip_vs_python_-m_pip.md
+│   ├── 03_venv.md
+│   ...
+│   └── README.md
+├── rust
+│   ├── 01_borrowing_and_ownership.md
+│   ├── 02_references_and_pointers.md
+│   ├── 03_lifetimes.md
+│   ├── 04_cargo.md
+│   ├── 05_print_and_format.md
+│   ├── 06_pinning,_moving_(&_memory),_copying.md
+│   ├── 07_tokio.md
+│   ├── 08_tower.md
+│   ...
+│   └── README.md
+...
+```
+Running
+```bash
+mdbook-tools summary --include-unnumbered-directories
+mdbook serve
+```
+Will give you:
+![Book Example](assets/outcome_example.png)
+
+### CLI Preview
 ```
 mdbook tools for organizing books.
 
@@ -38,7 +73,7 @@ Options:
 ```
 
 
-## Useful Bash Commands For Migration Over To mdtools-tools
+### Useful Bash Commands For Migration Over To mdtools-tools
 Replace all spaces in files and directories (including sub-directories) names with underscore
 ```bash
 find . -depth -name '* *' -execdir bash -c 'mv "$1" "${1// /_}"' bash {} \;
