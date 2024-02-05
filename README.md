@@ -37,20 +37,6 @@ mdbook serve
 Will give you:
 ![Book Example](assets/outcome_example.png)
 
-### What You Can Accomplish
-
-📚 **Generate Books**
-  - Ignore files or directories
-  - Do not include parent directories that do no have notes/README
-  - Respect or ignore numbering for directories or files
-  - Source from additional input
-
-🗂 **Organize with Elegance**
-  - Move files or directories between directories and specify index in new directory
-  - Re-order files
-  - Apply ordering to non-ordered files
-
-
 ### CLI Preview
 ```
 mdbook tools for organizing books.
