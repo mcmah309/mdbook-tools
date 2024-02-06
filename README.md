@@ -75,6 +75,10 @@ Options:
   -V, --version  Print version
 ```
 
+### Install
+```bash
+cargo install mdbook-tools
+```
 
 ### Useful Bash Commands For Migration Over To mdtools-tools
 Replace all spaces in files and directories (including sub-directories) names with underscore
