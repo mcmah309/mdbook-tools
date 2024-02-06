@@ -80,7 +80,7 @@ Options:
 cargo install mdbook-tools
 ```
 
-### Useful Bash Commands For Migration Over To mdtools-tools
+### Useful Bash Commands For Migration Over To mdbook-tools
 Replace all spaces in files and directories (including sub-directories) names with underscore
 ```bash
 find . -depth -name '* *' -execdir bash -c 'mv "$1" "${1// /_}"' bash {} \;
